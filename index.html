@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="謎解き・作問のための日本語文字置換辞書検索ツール。ある文字パターンを別のパターンに置き換えても辞書に存在する単語のペアを検索します。">
+  <title>nazoFinder - 謎解き作問用 文字置換辞書検索ツール</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="bg-glow-2"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-section">
+        <h1>nazoFinder <span class="accent">.</span></h1>
+        <p>謎解き作問支援：文字パターンを置き換えても辞書に残るペアを高速抽出</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btnShowHelp">使い方 / 辞書形式</button>
+    </header>
+
+    <!-- Compact Control Panel (Saves screen space) -->
+    <div class="control-panel">
+      <!-- Top Row: Dictionary Management -->
+      <div class="control-row top-row">
+        <div class="dict-mini-status">
+          <strong>📖 辞書:</strong> <span id="dictName">読み込み中...</span> 
+          (<span id="dictWordCount">0</span>語)
+          <span class="badge" id="dictBadge">内蔵</span>
+        </div>
+        
+        <div class="control-actions">
+          <div class="upload-btn-wrapper">
+            <button class="btn btn-secondary btn-sm">📂 カスタム辞書</button>
+            <input type="file" id="fileInput" accept=".txt,.csv">
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnShowBlacklist">🚫 除外ワード管理 (<span id="blacklistCount">0</span>)</button>
+          <button class="btn btn-secondary btn-sm" id="btnResetDict">🔄 内蔵辞書にリセット</button>
+        </div>
+      </div>
+
+      <!-- Bottom Row: Search Settings -->
+      <div class="control-row bottom-row">
+        <!-- Riddle Rule -->
+        <div class="control-item">
+          <label for="riddleRule">ルール:</label>
+          <select id="riddleRule" style="width: 135px;">
+            <option value="replace" selected>🔁 文字置換 (はがき謎)</option>
+            <option value="reverse">🙃 さかさま (逆さ読み)</option>
+            <option value="tanuki">🦝 たぬき (文字消去)</option>
+            <option value="deleteNth">❌ n文字目消し</option>
+            <option value="dakuon">💡 濁点・半濁点化</option>
+          </select>
+        </div>
+
+        <!-- Inputs Wrapper -->
+        <div class="control-item" id="ruleInputsContainer">
+          <span id="charAWrapper" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+            <label id="labelCharA" for="charA">置換前:</label>
+            <input type="text" id="charA" placeholder="てか" style="width: 70px;" value="てか">
+          </span>
+          <span class="arrow-icon" id="arrowIconAB">➔</span>
+          <span id="charBWrapper" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+            <label id="labelCharB" for="charB">置換後:</label>
+            <input type="text" id="charB" placeholder="み" style="width: 70px;" value="み">
+          </span>
+        </div>
+
+        <!-- Length -->
+        <div class="control-item">
+          <label>文字長:</label>
+          <div class="length-inputs">
+            <input type="number" id="minLength" value="3" min="1" max="20" style="width: 45px;">
+            <span>~</span>
+            <input type="number" id="maxLength" value="6" min="1" max="20" style="width: 45px;">
+          </div>
+        </div>
+
+        <!-- POS Filter -->
+        <div class="control-item">
+          <label>品詞:</label>
+          <div class="pos-checkboxes">
+            <label><input type="checkbox" id="posN" checked>名詞</label>
+            <label><input type="checkbox" id="posA" checked>形容</label>
+            <label><input type="checkbox" id="posV" checked>動詞</label>
+            <label><input type="checkbox" id="posD">副詞</label>
+          </div>
+        </div>
+
+        <!-- Replace rule (Only visible for 'replace' mode) -->
+        <div class="control-item" id="replaceModeContainer">
+          <label for="replaceMode">置換位置:</label>
+          <select id="replaceMode">
+            <option value="first" selected>最初の箇所</option>
+            <option value="last">最後の箇所</option>
+            <option value="all">すべての箇所</option>
+          </select>
+        </div>
+
+        <!-- Constraint on Destination -->
+        <div class="control-item">
+          <label class="checkbox-label" style="font-weight: normal;">
+            <input type="checkbox" id="limitPosAfter" checked>
+            変換後も同じ品詞
+          </label>
+        </div>
+
+        <!-- Group Homophones Toggle -->
+        <div class="control-item">
+          <label class="checkbox-label" style="font-weight: normal;">
+            <input type="checkbox" id="groupHomophones" checked>
+            同音異義語をまとめる
+          </label>
+        </div>
+
+        <!-- Search button -->
+        <button class="btn" id="btnSearch" style="margin-left: auto;">🔍 単語ペアを検索</button>
+      </div>
+    </div>
+
+    <!-- Main Content Layout (2 Columns) -->
+    <div class="main-layout" style="display: flex; gap: 1rem; align-items: flex-start; flex-grow: 1; width: 100%;">
+      <!-- Left Column: "Ga" Riddle Assistant -->
+      <div class="card" id="gaAssistantCard" style="width: 290px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; max-height: calc(100vh - 240px); overflow: hidden;">
+        <div style="font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>🎯 「が」謎アシスタント</span>
+          <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 600;" id="gaWordCount">0語</span>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-secondary); margin: 0.5rem 0; line-height: 1.4;">
+          「〇〇が〇〇」形式の謎解き用単語リスト。クリックで自動検索します。
+        </p>
+
+        <!-- Filters group -->
+        <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; background: rgba(0,0,0,0.15); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--card-border);">
+          <!-- Length Selectors -->
+          <div style="display: flex; gap: 0.4rem; align-items: center;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 0.15rem;">
+              <label style="font-size: 0.65rem; color: var(--text-secondary);">「が」の前:</label>
+              <select id="gaFilterBeforeLen" style="font-size: 0.75rem; padding: 0.25rem 0.4rem; width: 100%;">
+                <option value="all">すべて</option>
+                <option value="1" selected>1文字</option>
+                <option value="2">2文字</option>
+                <option value="3">3文字以上</option>
+              </select>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 0.15rem;">
+              <label style="font-size: 0.65rem; color: var(--text-secondary);">「が」の後:</label>
+              <select id="gaFilterAfterLen" style="font-size: 0.75rem; padding: 0.25rem 0.4rem; width: 100%;">
+                <option value="all">すべて</option>
+                <option value="1" selected>1文字</option>
+                <option value="2">2文字</option>
+                <option value="3">3文字以上</option>
+              </select>
+            </div>
+          </div>
+          <!-- Text filter -->
+          <input type="text" id="gaSearchInput" placeholder="単語またはよみで絞り込み..." style="font-size: 0.75rem; padding: 0.35rem 0.5rem; width: 100%; margin: 0;">
+          <!-- Illust filter -->
+          <label style="font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem; cursor: pointer; margin-top: 0.2rem; user-select: none;">
+            <input type="checkbox" id="gaFilterIllustOnly" style="width: 0.8rem; height: 0.8rem;">
+            🎨 イラスト可能のみ表示
+          </label>
+        </div>
+        
+        <!-- List container -->
+        <div id="gaWordsContainer" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding-right: 0.15rem;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; padding: 1rem 0;">辞書ロード後に表示されます</div>
+        </div>
+      </div>
+
+      <!-- Right Column: Results Card -->
+      <div class="card" id="mainResultsCard" style="min-height: 400px; position: relative; flex-grow: 1;">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="spinner"></div>
+          <div id="loadingText" style="font-weight: 500; font-size: 0.9rem;">辞書を読み込んでいます...</div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="loadingProgressBar"></div>
+          </div>
+        </div>
+
+        <div class="results-header">
+          <div class="results-info" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem;">
+            <span>検索結果: <span class="count" id="resultCount">0</span> 件 (ひらがな表記で比較)</span>
+            <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem; cursor: pointer; user-select: none; border-left: 1px solid var(--card-border); padding-left: 1rem;">
+              <input type="checkbox" id="filterIllustOnly" style="width: 0.85rem; height: 0.85rem;">
+              🎨 イラスト可能のみ
+            </label>
+          </div>
+          <div class="actions-row" id="resultActions" style="display: none;">
+            <button class="btn btn-secondary btn-sm" id="btnCopyAll">📋 コピー</button>
+            <button class="btn btn-secondary btn-sm" id="btnExportCSV">📥 CSV保存</button>
+          </div>
+        </div>
+
+        <!-- Search Results Area -->
+        <div id="resultsContainer" style="flex-grow: 1; display: flex; flex-direction: column;">
+          <div class="empty-state">
+            <div class="empty-state-icon">💡</div>
+            <p>置換パターン（例：置換前「てか」 ➔ 置換後「み」）と検索条件を設定して、上の「単語ペアを検索」ボタンを押してください。</p>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+              ※ 左の「が」謎アシスタントから単語を選択することでも、自動的に検索を実行できます。
+            </p>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Modal -->
+  <div class="modal-overlay" id="errorModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span>エラーが発生しました</span>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="errorMessage">
+        エラーメッセージがここに入ります。
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-modal-close">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help / Guide Modal -->
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal" style="max-width: 550px;">
+      <div class="modal-header">
+        <span>使い方 ＆ カスタム辞書形式</span>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body help-text" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <p><strong>nazoFinder</strong> は、単語内の文字列を別の文字列に置換したときに、どちらも辞書に存在する単語のペアを検索する謎解き作問支援ツールです。</p>
+        <p>「てか」を「み」に変えて「てがみ（手紙）」➔「みがみ（三神）」のような複数文字の置換にも対応しています。</p>
+        
+        <div>
+          <strong style="color: var(--accent-cyan);">■ カスタム辞書ファイルの作成方法</strong>
+          <p>標準の19万語にない単語や、ご自身が選定した単語ファイル（UTF-8形式の <code>.txt</code> または <code>.csv</code>）を直接読み込ませることができます。</p>
+        </div>
+
+        <div>
+          <p style="font-weight: 500;">【推奨フォーマット：カンマ区切り】</p>
+          <p>1行に「表記,よみ,品詞」の順で記述します。</p>
+          <pre style="background: rgba(0,0,0,0.3); padding: 0.4rem; border-radius: 6px; margin: 0.2rem 0; font-family: monospace; font-size: 0.75rem;">
+手紙,てがみ,名詞
+三神,みがみ,名詞
+美しい,うつくしい,形容詞
+走る,はしる,動詞</pre>
+          <p style="font-size: 0.75rem; color: var(--text-secondary);">※品詞は「名詞 / 形容詞 / 動詞 / 副詞」または「N / A / V / D」と指定します（省略時は名詞になります）。</p>
+        </div>
+
+        <div>
+          <p style="font-weight: 500;">【簡易フォーマット：1行1単語】</p>
+          <p>ひらがな単語を並べるだけでも動作します（表記とよみは同一となり、すべて「名詞」扱いとなります）。</p>
+          <pre style="background: rgba(0,0,0,0.3); padding: 0.4rem; border-radius: 6px; margin: 0.2rem 0; font-family: monospace; font-size: 0.75rem;">
+てがみ
+みがみ
+なぞとき</pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-modal-close">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blacklist Management Modal -->
+  <div class="modal-overlay" id="blacklistModal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <span>🚫 除外ワード ＆ 設定管理</span>
+        <button class="modal-close" id="btnBlacklistModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          検索結果の「🚫」ボタンを押して追加した単語の一覧です。ここに登録された単語は、元の単語、変換後の単語のいずれかに含まれている場合、検索結果から自動的に除外されます。（ブラウザに自動保存されます）
+        </p>
+        
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <input type="text" id="inputAddBlacklist" placeholder="除外したい単語を入力" style="flex-grow: 1; font-size: 0.8rem; padding: 0.35rem 0.5rem;">
+          <button class="btn btn-sm" id="btnAddBlacklist">追加</button>
+        </div>
+
+        <div style="font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.25rem;">
+          登録済みワード一覧 (<span id="modalBlacklistCount">0</span>)
+        </div>
+        
+        <div class="blacklist-chips" id="blacklistChipsContainer" style="max-height: 150px; overflow-y: auto; padding: 0.25rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <!-- Chips will go here -->
+        </div>
+
+        <!-- Settings Backup/Restore -->
+        <div style="margin-top: 1rem; padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+          <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-secondary);">⚙️ 設定のバックアップと復元 (除外・イラスト設定)</div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-sm" id="btnExportSettings" style="flex: 1;">📤 設定をエクスポート</button>
+            <div class="upload-btn-wrapper" style="flex: 1; margin: 0;">
+              <button class="btn btn-secondary btn-sm" style="width: 100%;">📥 設定をインポート</button>
+              <input type="file" id="settingsFileInput" accept=".json">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button class="btn btn-secondary btn-sm" id="btnClearBlacklist" style="color: var(--danger);">全てクリア</button>
+        <button class="btn btn-modal-close" id="btnBlacklistModalOk">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>nazoFinder © 2026. Built with Antigravity. Open sourced on GitHub.</p>
+  </footer>
+
+  <!-- Include dictionary data and main app -->
+  <script src="dict_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
