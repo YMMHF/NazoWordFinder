@@ -1,4 +1,4 @@
-// nazoFinder Application Logic
+// NazoWordFinder Application Logic
 
 // Global Application State
 let currentDictionary = []; // Array of { word, yomi, pos }
@@ -183,7 +183,15 @@ function updateDictionaryStatus(wordCount, isCustom = false) {
 
 // Load Blacklist from localStorage
 function loadBlacklist() {
-  const saved = localStorage.getItem('nazoFinder_blacklist');
+  let saved = localStorage.getItem('nazoWordFinder_blacklist');
+  if (!saved) {
+    // Fallback migration from old app name settings
+    saved = localStorage.getItem('nazoFinder_blacklist');
+    if (saved) {
+      localStorage.setItem('nazoWordFinder_blacklist', saved);
+      localStorage.removeItem('nazoFinder_blacklist');
+    }
+  }
   if (saved) {
     try {
       const arr = JSON.parse(saved);
@@ -197,7 +205,7 @@ function loadBlacklist() {
 
 // Save Blacklist to localStorage
 function saveBlacklist() {
-  localStorage.setItem('nazoFinder_blacklist', JSON.stringify(Array.from(blacklist)));
+  localStorage.setItem('nazoWordFinder_blacklist', JSON.stringify(Array.from(blacklist)));
   updateBlacklistCountUI();
 }
 
@@ -1025,7 +1033,7 @@ function exportResultsToCSV() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", `nazoFinder_results_${Date.now()}.csv`);
+  link.setAttribute("download", `nazoWordFinder_results_${Date.now()}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -1206,11 +1214,26 @@ function toggleIllustrable(word, yomi) {
 
 // Load illustrable state from localStorage
 function loadIllustrableState() {
-  const savedI = localStorage.getItem('nazoFinder_illustrable');
+  let savedI = localStorage.getItem('nazoWordFinder_illustrable');
+  if (!savedI) {
+    savedI = localStorage.getItem('nazoFinder_illustrable');
+    if (savedI) {
+      localStorage.setItem('nazoWordFinder_illustrable', savedI);
+      localStorage.removeItem('nazoFinder_illustrable');
+    }
+  }
   if (savedI) {
     try { illustrableSet = new Set(JSON.parse(savedI)); } catch(e) {}
   }
-  const savedNI = localStorage.getItem('nazoFinder_nonIllustrable');
+
+  let savedNI = localStorage.getItem('nazoWordFinder_nonIllustrable');
+  if (!savedNI) {
+    savedNI = localStorage.getItem('nazoFinder_nonIllustrable');
+    if (savedNI) {
+      localStorage.setItem('nazoWordFinder_nonIllustrable', savedNI);
+      localStorage.removeItem('nazoFinder_nonIllustrable');
+    }
+  }
   if (savedNI) {
     try { nonIllustrableSet = new Set(JSON.parse(savedNI)); } catch(e) {}
   }
@@ -1218,8 +1241,8 @@ function loadIllustrableState() {
 
 // Save illustrable state to localStorage
 function saveIllustrableState() {
-  localStorage.setItem('nazoFinder_illustrable', JSON.stringify(Array.from(illustrableSet)));
-  localStorage.setItem('nazoFinder_nonIllustrable', JSON.stringify(Array.from(nonIllustrableSet)));
+  localStorage.setItem('nazoWordFinder_illustrable', JSON.stringify(Array.from(illustrableSet)));
+  localStorage.setItem('nazoWordFinder_nonIllustrable', JSON.stringify(Array.from(nonIllustrableSet)));
 }
 
 // Update search inputs visibility and placeholders based on selected riddle rule
@@ -1302,7 +1325,7 @@ function exportSettings() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", `nazoFinder_settings_${Date.now()}.json`);
+  link.setAttribute("download", `nazoWordFinder_settings_${Date.now()}.json`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
